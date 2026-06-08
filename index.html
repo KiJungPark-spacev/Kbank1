@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>가상계좌 업체 변경 효과 시뮬레이터</title>
+<style>
+:root {
+  --bg:#f6f7f9; --panel:#fff; --text:#17202a; --muted:#667085; --line:#e6e9ef;
+  --accent:#1f6feb; --good:#0f766e; --bad:#b42318; --soft:#eef5ff; --warn:#fff7ed;
+  --shadow:0 10px 28px rgba(15,23,42,.08);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans KR",Arial,sans-serif;line-height:1.45}
+.wrap{max-width:1160px;margin:0 auto;padding:32px 20px 48px}
+h1{margin:0 0 8px;font-size:28px;letter-spacing:-.04em}
+h2{margin:0 0 14px;font-size:18px;letter-spacing:-.03em}
+h3{margin:18px 0 10px;font-size:15px}
+.sub,.note{color:var(--muted);font-size:13px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:18px;margin-top:16px}
+.grid{display:grid;gap:16px}.cols2{grid-template-columns:repeat(2,1fr)}.cols3{grid-template-columns:repeat(3,1fr)}.cols4{grid-template-columns:repeat(4,1fr)}
+.controls{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+label{display:block;font-size:13px;font-weight:700;margin-bottom:8px}
+select{width:100%;padding:12px;border:1px solid #cfd6e4;border-radius:12px;background:#fff;font-size:15px}
+.hint{margin-top:6px;color:var(--muted);font-size:12px}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px;min-height:112px}
+.kpi .label{color:var(--muted);font-size:13px;margin-bottom:8px}
+.kpi .val{font-size:25px;font-weight:800;letter-spacing:-.04em}
+.kpi.good .val{color:var(--good)}.kpi.bad .val{color:var(--bad)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:11px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}th{background:#f8fafc;color:#344054;font-weight:700}
+.box{background:var(--soft);border:1px solid #cfe2ff;border-radius:16px;padding:16px;margin-top:10px}
+.warn{background:var(--warn);border:1px solid #fed7aa;border-radius:14px;padding:12px 14px;color:#7c2d12;font-size:13px;margin-top:12px}
+.mono{font-variant-numeric:tabular-nums}
+.badtext{color:var(--bad)}.goodtext{color:var(--good)}
+@media(max-width:900px){.cols2,.cols3,.cols4,.controls{grid-template-columns:1fr}th,td{font-size:12px;padding:8px 6px}.kpi .val{font-size:21px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+<h1>가상계좌 업체 변경 효과 시뮬레이터</h1>
+<p class="sub">현재 Toss PG 가상계좌(T+5, 건당 180원)에서 더즌 케이뱅크 가상계좌(T+1, 건당 100원)로 변경하는 경우의 연간 효과를 계산함.</p>
+</header>
+
+<section class="panel">
+<h2>1. 입력 조건</h2>
+<div class="controls">
+  <div>
+    <label for="amountGrowth">월평균 결제금액 상승률</label>
+    <select id="amountGrowth"></select>
+    <div class="hint">예치이자 효과에 반영. 결제금액이 커질수록 정산 단축 효과 증가.</div>
+  </div>
+  <div>
+    <label for="txGrowth">월평균 결제건수 상승률</label>
+    <select id="txGrowth"></select>
+    <div class="hint">수수료 절감 효과에 반영. 결제건수가 늘수록 건당 80원 절감 효과 증가.</div>
+  </div>
+</div>
+<div class="warn">
+고정 전제: Toss PG T+5 → 더즌 케이뱅크 T+1, 정산 단축 4일, 연 예치이율 3%, 수수료 180원 → 100원. 영업일 기준 주말 효과는 별도 반영하지 않은 보수적 계산임.
+</div>
+</section>
+
+<section class="grid cols4" style="margin-top:16px">
+  <div class="kpi">
+    <div class="label">연환산 가상계좌 결제금액</div>
+    <div id="annualAmount" class="val mono">-</div>
+    <div class="note">예치이자 산정 기준</div>
+  </div>
+  <div class="kpi">
+    <div class="label">연환산 가상계좌 결제건수</div>
+    <div id="annualTx" class="val mono">-</div>
+    <div class="note">수수료 산정 기준</div>
+  </div>
+  <div class="kpi good">
+    <div class="label">연 예치이자 효과</div>
+    <div id="interestEffect" class="val mono">-</div>
+    <div class="note">일평균 결제액 × 4일 × 3%</div>
+  </div>
+  <div class="kpi good">
+    <div class="label">연 총 손익 효과</div>
+    <div id="totalEffect" class="val mono">-</div>
+    <div class="note">예치이자 효과 + 수수료 절감</div>
+  </div>
+</section>
+
+<section class="panel">
+<h2>2. 효과 상세</h2>
+<table>
+<thead>
+<tr><th>구분</th><th>현재 Toss PG</th><th>더즌 케이뱅크</th><th>연간 효과</th></tr>
+</thead>
+<tbody>
+<tr><td>정산 조건</td><td>T+5</td><td>T+1</td><td id="settlementEffect">4일 단축</td></tr>
+<tr><td>가상계좌 수수료</td><td>건당 180원</td><td>건당 100원</td><td>건당 80원 절감</td></tr>
+<tr><td>연 예치이자 효과</td><td>-</td><td>-</td><td id="interestDetail" class="mono goodtext">-</td></tr>
+<tr><td>연 수수료 절감 효과</td><td id="currentFee" class="mono">-</td><td id="newFee" class="mono">-</td><td id="feeSaving" class="mono goodtext">-</td></tr>
+<tr><td><b>연 총 손익 효과</b></td><td>-</td><td>-</td><td id="totalDetail" class="mono goodtext"><b>-</b></td></tr>
+</tbody>
+</table>
+</section>
+
+<section class="panel">
+<h2>3. 월별 성장 반영 추정</h2>
+<table>
+<thead>
+<tr><th>월</th><th>결제금액 성장 배수</th><th>결제건수 성장 배수</th><th>월 결제금액</th><th>월 결제건수</th><th>월 예치이자 효과</th><th>월 수수료 절감</th><th>월 총 효과</th></tr>
+</thead>
+<tbody id="monthlyBody"></tbody>
+</table>
+<p class="note">월별 추정은 기준 일평균값을 월 30.42일로 환산한 뒤, 선택한 월평균 상승률을 순차 적용함.</p>
+</section>
+
+<section class="panel">
+<h2>4. 기준값</h2>
+<div class="grid cols3">
+  <div class="kpi"><div class="label">분석 기간</div><div class="val mono">2026.03.01~05.18</div><div class="note">79일</div></div>
+  <div class="kpi"><div class="label">가상계좌 결제금액</div><div class="val mono" id="baseAmount">-</div><div class="note">33mwebx787 제외</div></div>
+  <div class="kpi"><div class="label">가상계좌 결제건수</div><div class="val mono" id="baseTx">-</div><div class="note">완료/양수 기준</div></div>
+</div>
+<table style="margin-top:14px">
+<tbody>
+<tr><td>일평균 결제금액</td><td id="baseDailyAmount" class="mono"></td></tr>
+<tr><td>일평균 결제건수</td><td id="baseDailyTx" class="mono"></td></tr>
+<tr><td>현재 수수료 구조</td><td class="mono">Toss PG 가상계좌 / T+5 / 건당 180원</td></tr>
+<tr><td>변경 수수료 구조</td><td class="mono">더즌 케이뱅크 가상계좌 / T+1 / 건당 100원</td></tr>
+</tbody>
+</table>
+</section>
+
+<section class="panel">
+<h2>5. 해석</h2>
+<div id="summary" class="box"></div>
+<p class="note">본 시뮬레이션은 3월 이후 가상계좌 거래 데이터를 기준으로 한 추정치임. 영업일 정산에 따른 주말 효과를 반영하면 예치이자 효과는 보수적 계산보다 커질 수 있음.</p>
+</section>
+</div>
+
+<script>
+const BASE = {
+  days: 79,
+  amount: 19643380368,
+  tx: 17975,
+  currentFee: 180,
+  newFee: 100,
+  settlementShortenDays: 4,
+  interestRate: 0.03
+};
+
+function fillSelect(id, options, def) {
+  const s = document.getElementById(id);
+  options.forEach(v => {
+    const o = document.createElement("option");
+    o.value = v / 100;
+    o.textContent = v + "%";
+    if (v === def) o.selected = true;
+    s.appendChild(o);
+  });
+}
+fillSelect("amountGrowth", [0,1,2,3,5,7,10], 0);
+fillSelect("txGrowth", [0,1,2,3,5,7,10], 0);
+
+function krw(n) {
+  const sign = n < 0 ? "-" : "";
+  n = Math.abs(n);
+  if (n >= 100000000) return sign + (n / 100000000).toLocaleString("ko-KR", {maximumFractionDigits: 1}) + "억 원";
+  if (n >= 10000) return sign + Math.round(n / 10000).toLocaleString("ko-KR") + "만 원";
+  return sign + Math.round(n).toLocaleString("ko-KR") + "원";
+}
+function count(n) { return Math.round(n).toLocaleString("ko-KR") + "건"; }
+function pct(n) { return (n * 100).toLocaleString("ko-KR", {maximumFractionDigits: 1}) + "%"; }
+function growthFactor(r) {
+  let sum = 0;
+  for (let m=0; m<12; m++) sum += Math.pow(1+r, m);
+  return sum / 12;
+}
+
+function calculate() {
+  const amountGrowth = Number(document.getElementById("amountGrowth").value);
+  const txGrowth = Number(document.getElementById("txGrowth").value);
+  const amountGf = growthFactor(amountGrowth);
+  const txGf = growthFactor(txGrowth);
+
+  const dailyAmount = BASE.amount / BASE.days;
+  const dailyTx = BASE.tx / BASE.days;
+
+  const annualAmount = dailyAmount * 365 * amountGf;
+  const annualTx = dailyTx * 365 * txGf;
+
+  const interestEffect = (annualAmount / 365) * BASE.settlementShortenDays * BASE.interestRate;
+  const currentFee = annualTx * BASE.currentFee;
+  const newFee = annualTx * BASE.newFee;
+  const feeSaving = currentFee - newFee;
+  const totalEffect = interestEffect + feeSaving;
+
+  document.getElementById("annualAmount").textContent = krw(annualAmount);
+  document.getElementById("annualTx").textContent = count(annualTx);
+  document.getElementById("interestEffect").textContent = krw(interestEffect);
+  document.getElementById("totalEffect").textContent = krw(totalEffect);
+  document.getElementById("interestDetail").textContent = krw(interestEffect);
+  document.getElementById("currentFee").textContent = krw(currentFee);
+  document.getElementById("newFee").textContent = krw(newFee);
+  document.getElementById("feeSaving").textContent = krw(feeSaving);
+  document.getElementById("totalDetail").innerHTML = "<b>" + krw(totalEffect) + "</b>";
+
+  document.getElementById("baseAmount").textContent = krw(BASE.amount);
+  document.getElementById("baseTx").textContent = count(BASE.tx);
+  document.getElementById("baseDailyAmount").textContent = krw(dailyAmount);
+  document.getElementById("baseDailyTx").textContent = dailyTx.toLocaleString("ko-KR", {maximumFractionDigits: 1}) + "건";
+
+  const monthDays = 365/12;
+  let tbody = document.getElementById("monthlyBody");
+  tbody.innerHTML = "";
+  let yearInterest = 0, yearFee = 0;
+  for (let m=0; m<12; m++) {
+    const ag = Math.pow(1+amountGrowth, m);
+    const tg = Math.pow(1+txGrowth, m);
+    const monthlyAmount = dailyAmount * monthDays * ag;
+    const monthlyTx = dailyTx * monthDays * tg;
+    const monthlyInterest = dailyAmount * ag * BASE.settlementShortenDays * BASE.interestRate;
+    const monthlyFeeSaving = monthlyTx * (BASE.currentFee - BASE.newFee);
+    const monthlyTotal = monthlyInterest + monthlyFeeSaving;
+    yearInterest += monthlyInterest;
+    yearFee += monthlyFeeSaving;
+    tbody.innerHTML += `<tr>
+      <td>${m+1}개월차</td>
+      <td>${ag.toLocaleString("ko-KR", {maximumFractionDigits: 3})}배</td>
+      <td>${tg.toLocaleString("ko-KR", {maximumFractionDigits: 3})}배</td>
+      <td class="mono">${krw(monthlyAmount)}</td>
+      <td class="mono">${count(monthlyTx)}</td>
+      <td class="mono goodtext">${krw(monthlyInterest)}</td>
+      <td class="mono goodtext">${krw(monthlyFeeSaving)}</td>
+      <td class="mono goodtext">${krw(monthlyTotal)}</td>
+    </tr>`;
+  }
+
+  document.getElementById("summary").innerHTML =
+    `선택 조건 기준, 가상계좌 업체를 Toss PG에서 더즌 케이뱅크로 변경하면 연간 <b>${krw(interestEffect)}</b>의 예치이자 효과와 <b>${krw(feeSaving)}</b>의 수수료 절감 효과가 발생함.<br><br>` +
+    `연 총 손익 효과는 <b>${krw(totalEffect)}</b>로 추정됨. 결제금액 상승률은 예치이자 효과에, 결제건수 상승률은 수수료 절감 효과에 각각 영향을 줌.<br><br>` +
+    `정산 조건은 T+5에서 T+1로 4일 단축되는 구조로 반영했으며, 영업일 기준 주말 효과는 보수적으로 제외했음.`;
+}
+
+["amountGrowth", "txGrowth"].forEach(id => document.getElementById(id).addEventListener("change", calculate));
+calculate();
+</script>
+</body>
+</html>
