@@ -106,11 +106,11 @@ th:first-child,td:first-child{text-align:left}th{background:#f8fafc;color:#34405
 <h2>3. 월별 성장 반영 추정</h2>
 <table>
 <thead>
-<tr><th>월</th><th>결제금액 성장 배수</th><th>결제건수 성장 배수</th><th>월 결제금액</th><th>월 결제건수</th><th>월 예치이자 효과</th><th>월 수수료 절감</th><th>월 총 효과</th></tr>
+<tr><th>월</th><th>결제금액 성장 배수</th><th>결제건수 성장 배수</th><th>월 결제금액</th><th>월 결제건수</th><th>해당 월 예치이자 효과</th><th>해당 월 수수료 절감</th><th>해당 월 총 효과</th></tr>
 </thead>
 <tbody id="monthlyBody"></tbody>
 </table>
-<p class="note">월별 추정은 기준 일평균값을 월 30.42일로 환산한 뒤, 선택한 월평균 상승률을 순차 적용함.</p>
+<p class="note">월별 추정은 기준 일평균값을 월 30.42일로 환산한 뒤, 해당 월에 발생하는 예치이자 효과와 수수료 절감 효과를 계산함.</p>
 </section>
 
 <section class="panel">
@@ -218,7 +218,7 @@ function calculate() {
     const tg = Math.pow(1+txGrowth, m);
     const monthlyAmount = dailyAmount * monthDays * ag;
     const monthlyTx = dailyTx * monthDays * tg;
-    const monthlyInterest = dailyAmount * ag * BASE.settlementShortenDays * BASE.interestRate;
+    const monthlyInterest = monthlyAmount * BASE.settlementShortenDays * BASE.interestRate / 365;
     const monthlyFeeSaving = monthlyTx * (BASE.currentFee - BASE.newFee);
     const monthlyTotal = monthlyInterest + monthlyFeeSaving;
     yearInterest += monthlyInterest;
